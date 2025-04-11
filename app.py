@@ -25,7 +25,6 @@ def init_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 full_name TEXT NOT NULL,
                 username TEXT UNIQUE NOT NULL,
-                age INTEGER NOT NULL,
                 email TEXT UNIQUE NOT NULL,
                 password TEXT NOT NULL,
                 dob TEXT NOT NULL,
@@ -93,7 +92,6 @@ def register():
     data = request.json
     full_name = data.get('fullName')
     username = data.get('username')
-    age = data.get('age')
     email = data.get('email')
     password = data.get('password')
     confirm_password = data.get('confirmPassword')
@@ -101,7 +99,7 @@ def register():
     gender = data.get('gender')
     address = data.get('address')
 
-    if not all([full_name, username, age, email, password, confirm_password, dob, gender, address]):
+    if not all([full_name, username, email, password, confirm_password, dob, gender, address]):
         return jsonify({"success": False, "message": "All fields are required."}), 400
 
     if password != confirm_password:
@@ -113,9 +111,9 @@ def register():
         with sqlite3.connect(DB_NAME) as conn:
             cursor = conn.cursor()
             cursor.execute('''
-                INSERT INTO users (full_name, username, age, email, password, dob, gender, address)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
-                (full_name, username, age, email, hashed_password, dob, gender, address))
+                INSERT INTO users (full_name, username,  email, password, dob, gender, address)
+                VALUES (?, ?, ?, ?, ?, ?, ?)''',
+                (full_name, username, email, hashed_password, dob, gender, address))
             conn.commit()
         return jsonify({"success": True, "message": "User registered successfully."})
     except sqlite3.IntegrityError as e:
