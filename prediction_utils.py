@@ -1,7 +1,7 @@
 from sklearn.linear_model import LinearRegression
 from sklearn.cluster import KMeans
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.svm import SVC
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.svm import SVC, SVR
 
 from sklearn.metrics import (
     precision_score, recall_score, f1_score, confusion_matrix,
@@ -47,19 +47,60 @@ def evaluate_regression(y_true, y_pred):
     return metrics
 
 
-def predict_model(model_type, X, y=None, params={}):
-    """Train and predict using the specified model."""
+
+def predict_model(model_type, X, int_X , y=None, params={}):
+    """
+    Trains the specified model using given data and makes a prediction on the input features.
+    
+    Args:
+        model_type (str): Type of ML model - 'linear', 'random_forest', 'svm', 'kmeans'.
+        X (pd.DataFrame): Feature dataset.
+        int_X (list): Feature values for prediction.
+        y (pd.Series, optional): Target values (if applicable).
+        params (dict): Extra hyperparameters.
+
+    Returns:
+        np.ndarray: Predicted values (or cluster labels in case of KMeans).
+    """
+
+    # Ensure int_X is in 2D array format for prediction
+    if isinstance(int_X, list):
+        int_X = np.array(int_X).reshape(1, -1)
+
+    # LINEAR REGRESSION
     if model_type == 'linear':
         model = LinearRegression()
-    elif model_type == 'random_forest':
-        model = RandomForestClassifier(n_estimators=params.get('n_estimators', 100))
-    elif model_type == 'svm':
-        model = SVC(kernel=params.get('kernel', 'linear'))
-    elif model_type == 'kmeans':
-        model = KMeans(n_clusters=params.get('n_clusters', 3))
-        return model.fit_predict(X)  # KMeans doesn't require `y`
-    else:
-        raise ValueError("Invalid model type")
+        model.fit(X, y)
+        return model.predict(int_X)
 
-    model.fit(X, y)
-    return model.predict(X)
+    # RANDOM FOREST (Classifier or Regressor based on target)
+    elif model_type == 'random_forest':
+        if y.dtype == 'O' or len(set(y)) < 20:  # Heuristic: classification
+            model = RandomForestClassifier(n_estimators=int(params.get('n_estimators', 100)))
+        else:
+            model = RandomForestRegressor(n_estimators=int(params.get('n_estimators', 100)))
+        
+        model.fit(X, y)
+        return model.predict(int_X)
+
+    # SVM (Classifier or Regressor)
+    elif model_type == 'svm':
+        kernel = params.get('kernel', 'linear')
+        
+        if y.dtype == 'O' or len(set(y)) < 20:  # Heuristic: classification
+            model = SVC(kernel=kernel, probability=True)
+        else:
+            model = SVR(kernel=kernel)
+
+        model.fit(X, y)
+        return model.predict(int_X)
+
+    # K-MEANS CLUSTERING (Unsupervised)
+    elif model_type == 'kmeans':
+        n_clusters = int(params.get('n_clusters', 3))
+        model = KMeans(n_clusters=n_clusters, random_state=42)
+        model.fit(X)
+        return model.predict(X)  # Predict cluster of the new point
+
+    else:
+        raise ValueError(f"Invalid model type: {model_type}")

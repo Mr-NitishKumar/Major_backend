@@ -1,3 +1,4 @@
+import json
 from flask import Flask, request, jsonify, session
 from config import UPLOAD_FOLDER, ALLOWED_EXTENSIONS
 from dataset_utils import analyze_dataset, categorical_summary, correlation_heatmap, descriptive_statistics, encode_categorical_data, generate_histograms, handle_missing_values, missing_value_summary, preprocess_dataset, scale_features, split_dataset
@@ -275,14 +276,32 @@ def predict():
     model_type = request.form.get('model')
     features = request.form.getlist('features')
     target = request.form.get('target')
-    params = request.form.to_dict()
 
-    df = pd.read_csv(file)
-    X = df[features]
-    y = df[target] if target in df.columns else None
+    # Safely parse feature values
+    try:
+        int_X = json.loads(request.form.get('feature_values'))
+    except:
+        return jsonify({'predictions': 'Invalid feature values format'})
 
-    predictions = predict_model(model_type, X, y, params)
-    return jsonify({"predictions": predictions.tolist()})
+    if not int_X:
+        return jsonify({'predictions': 'Please enter the features value for prediction'})
+
+    # Load CSV and extract data
+    try:
+        df = pd.read_csv(file)
+        X = df[features]
+        y = df[target] if target and target in df.columns else None
+
+        # Make sure int_X is 2D for prediction
+        if isinstance(int_X[0], (int, float, str)):
+            int_X = [int_X]
+
+        predictions = predict_model(model_type, X, int_X, y, request.form.to_dict())
+        return jsonify({"predictions": predictions.tolist()})
+
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
 
 @app.route('/visualize', methods=['POST'])
 def visualize():
@@ -291,7 +310,9 @@ def visualize():
 
     df = pd.read_csv(file)
     numeric_data = df.select_dtypes(include=['number'])
-    clusters = predict_model('kmeans', numeric_data, params={"n_clusters": n_clusters})
+    int_X = [0]
+    int_X = [int_X]
+    clusters = predict_model('kmeans', numeric_data,int_X, params={"n_clusters": n_clusters})
 
     plot_path = create_clustering_plot(numeric_data, clusters)
     return jsonify({"plot_url": f"/{plot_path}"})
@@ -350,9 +371,6 @@ def evaluate():
         return jsonify({"error": "Invalid model type for evaluation!"}), 400
 
     return jsonify({"metrics": metrics})
-
-
-
 
 
 
